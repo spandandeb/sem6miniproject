@@ -27,7 +27,14 @@ const Analytics: React.FC = () => {
       try {
         setIsLoading(true);
         const response = await axios.get('http://localhost:5000/api/feedback');
-        setFeedbackData(response.data);
+        // Filter out any feedback entries with invalid or missing ratings
+        const validFeedback = response.data.filter((feedback: Feedback) => (
+          feedback.rating > 0 && 
+          feedback.eventExperience > 0 && 
+          feedback.speakerInteraction > 0 && 
+          feedback.sessionRelevance > 0
+        ));
+        setFeedbackData(validFeedback);
         setError(null);
       } catch (err) {
         console.error('Error fetching feedback data:', err);
@@ -41,29 +48,49 @@ const Analytics: React.FC = () => {
   }, []);
 
   const calculateAverages = () => {
-    if (feedbackData.length === 0) return { rating: 0, eventExperience: 0, speakerInteraction: 0, sessionRelevance: 0 };
+    if (feedbackData.length === 0) {
+      return {
+        rating: 0,
+        eventExperience: 0,
+        speakerInteraction: 0,
+        sessionRelevance: 0
+      };
+    }
 
-    const sum = feedbackData.reduce(
-      (acc, feedback) => {
-        return {
-          rating: acc.rating + feedback.rating,
-          eventExperience: acc.eventExperience + feedback.eventExperience,
-          speakerInteraction: acc.speakerInteraction + feedback.speakerInteraction,
-          sessionRelevance: acc.sessionRelevance + feedback.sessionRelevance,
-        };
-      },
+    const validFeedbacks = feedbackData.filter(feedback => 
+      !isNaN(feedback.rating) && 
+      !isNaN(feedback.eventExperience) && 
+      !isNaN(feedback.speakerInteraction) && 
+      !isNaN(feedback.sessionRelevance)
+    );
+
+    if (validFeedbacks.length === 0) {
+      return {
+        rating: 0,
+        eventExperience: 0,
+        speakerInteraction: 0,
+        sessionRelevance: 0
+      };
+    }
+
+    const sum = validFeedbacks.reduce(
+      (acc, feedback) => ({
+        rating: acc.rating + (feedback.rating || 0),
+        eventExperience: acc.eventExperience + (feedback.eventExperience || 0),
+        speakerInteraction: acc.speakerInteraction + (feedback.speakerInteraction || 0),
+        sessionRelevance: acc.sessionRelevance + (feedback.sessionRelevance || 0),
+      }),
       { rating: 0, eventExperience: 0, speakerInteraction: 0, sessionRelevance: 0 }
     );
 
+    const count = validFeedbacks.length;
     return {
-      rating: parseFloat((sum.rating / feedbackData.length).toFixed(1)),
-      eventExperience: parseFloat((sum.eventExperience / feedbackData.length).toFixed(1)),
-      speakerInteraction: parseFloat((sum.speakerInteraction / feedbackData.length).toFixed(1)),
-      sessionRelevance: parseFloat((sum.sessionRelevance / feedbackData.length).toFixed(1)),
+      rating: Number((sum.rating / count).toFixed(1)) || 0,
+      eventExperience: Number((sum.eventExperience / count).toFixed(1)) || 0,
+      speakerInteraction: Number((sum.speakerInteraction / count).toFixed(1)) || 0,
+      sessionRelevance: Number((sum.sessionRelevance / count).toFixed(1)) || 0,
     };
   };
-
-  const averages = calculateAverages();
 
   const getAveragesByEvent = () => {
     const eventMap = new Map();
@@ -72,7 +99,7 @@ const Analytics: React.FC = () => {
       if (!eventMap.has(feedback.eventId)) {
         eventMap.set(feedback.eventId, {
           eventId: feedback.eventId,
-          eventName: feedback.eventName,
+          eventName: feedback.eventName || 'Unnamed Event',
           ratings: [],
           eventExperiences: [],
           speakerInteractions: [],
@@ -82,39 +109,39 @@ const Analytics: React.FC = () => {
       }
 
       const eventData = eventMap.get(feedback.eventId);
-      eventData.ratings.push(feedback.rating);
-      eventData.eventExperiences.push(feedback.eventExperience);
-      eventData.speakerInteractions.push(feedback.speakerInteraction);
-      eventData.sessionRelevances.push(feedback.sessionRelevance);
+      if (!isNaN(feedback.rating)) eventData.ratings.push(feedback.rating);
+      if (!isNaN(feedback.eventExperience)) eventData.eventExperiences.push(feedback.eventExperience);
+      if (!isNaN(feedback.speakerInteraction)) eventData.speakerInteractions.push(feedback.speakerInteraction);
+      if (!isNaN(feedback.sessionRelevance)) eventData.sessionRelevances.push(feedback.sessionRelevance);
       eventData.count++;
     });
 
     return Array.from(eventMap.values()).map(event => {
-      const avgRating = event.ratings.reduce((a: number, b: number) => a + b, 0) / event.count;
-      const avgEventExp = event.eventExperiences.reduce((a: number, b: number) => a + b, 0) / event.count;
-      const avgSpeakerInt = event.speakerInteractions.reduce((a: number, b: number) => a + b, 0) / event.count;
-      const avgSessionRel = event.sessionRelevances.reduce((a: number, b: number) => a + b, 0) / event.count;
+      const calculateAverage = (arr: number[]) => {
+        if (arr.length === 0) return 0;
+        const sum = arr.reduce((a, b) => a + b, 0);
+        return Number((sum / arr.length).toFixed(1));
+      };
 
       return {
         eventId: event.eventId,
         eventName: event.eventName,
-        avgRating: parseFloat(avgRating.toFixed(1)),
-        avgEventExperience: parseFloat(avgEventExp.toFixed(1)),
-        avgSpeakerInteraction: parseFloat(avgSpeakerInt.toFixed(1)),
-        avgSessionRelevance: parseFloat(avgSessionRel.toFixed(1)),
+        avgRating: calculateAverage(event.ratings),
+        avgEventExperience: calculateAverage(event.eventExperiences),
+        avgSpeakerInteraction: calculateAverage(event.speakerInteractions),
+        avgSessionRelevance: calculateAverage(event.sessionRelevances),
         count: event.count
       };
     });
   };
 
-  const eventAverages = getAveragesByEvent();
-
   const getRatingDistribution = () => {
     const distribution = [0, 0, 0, 0, 0]; // For ratings 1-5
 
     feedbackData.forEach(feedback => {
-      if (feedback.rating >= 1 && feedback.rating <= 5) {
-        distribution[feedback.rating - 1]++;
+      const rating = Math.round(feedback.rating);
+      if (rating >= 1 && rating <= 5) {
+        distribution[rating - 1]++;
       }
     });
 
@@ -126,6 +153,9 @@ const Analytics: React.FC = () => {
       { name: '5 Stars', value: distribution[4] },
     ];
   };
+
+  const averages = calculateAverages();
+  const eventAverages = getAveragesByEvent();
 
   const overviewData = [
     { name: 'Overall Rating', value: averages.rating },
@@ -310,72 +340,69 @@ const Analytics: React.FC = () => {
     </div>
   );
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <p className="text-gray-600">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg max-w-lg text-center">
+          <p className="font-medium mb-2">Error Loading Data</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (feedbackData.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-lg">
+          <h2 className="text-2xl font-bold text-gray-700 mb-2">No Feedback Data Available</h2>
+          <p className="text-gray-500">Start collecting feedback from events and mentorship sessions to see analytics here.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Feedback Analytics</h1>
-        <p className="text-gray-600 mt-2">
-          View and analyze feedback from events and mentorship sessions.
-        </p>
+        <p className="mt-2 text-gray-600">View and analyze feedback from events and mentorship sessions.</p>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4">
-          <p>{error}</p>
-          <p className="mt-2 text-sm">
-            Note: You may see this message if you haven't set up the feedback API endpoint yet.
-          </p>
-        </div>
-      ) : feedbackData.length === 0 ? (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4">
-          <p>No feedback data available yet. Once users submit feedback, it will appear here.</p>
-        </div>
-      ) : (
-        <>
-          <div className="mb-6 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`${
-                  activeTab === 'overview'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('events')}
-                className={`${
-                  activeTab === 'events'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-              >
-                Events Analysis
-              </button>
-              <button
-                onClick={() => setActiveTab('details')}
-                className={`${
-                  activeTab === 'details'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-              >
-                Detailed Feedback
-              </button>
-            </nav>
-          </div>
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          {['overview', 'events', 'details'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as 'overview' | 'events' | 'details')}
+              className={`
+                py-4 px-1 border-b-2 font-medium text-sm
+                ${activeTab === tab
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }
+              `}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-          {activeTab === 'overview' && renderOverviewTab()}
-          {activeTab === 'events' && renderEventsTab()}
-          {activeTab === 'details' && renderDetailsTab()}
-        </>
-      )}
+      {activeTab === 'overview' && renderOverviewTab()}
+      {activeTab === 'events' && renderEventsTab()}
+      {activeTab === 'details' && renderDetailsTab()}
     </div>
   );
 };
