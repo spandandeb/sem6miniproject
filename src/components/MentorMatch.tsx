@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, MapPin, Briefcase, Clock, Star, MessageSquare, Filter, X } from 'lucide-react';
+import { Search, MapPin, Briefcase, Clock, Star, MessageSquare, Filter, X, Users } from 'lucide-react';
 import FeedbackForm from './FeedbackForm';
 
 // Define interfaces for our data models
@@ -24,6 +24,7 @@ interface User {
   location: string;
   industry: Industry;
   experienceYears: number;
+  profileImage?: string;
 }
 
 interface Alumni extends User {
@@ -123,6 +124,7 @@ const calculateMatchScoreLocal = (student: User, alumni: Alumni): number => {
 };
 
 const MentorMatch: React.FC = () => {
+  
   // State for API loading and errors
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -356,7 +358,8 @@ const MentorMatch: React.FC = () => {
       bio: studentBio,
       location: studentLocation,
       industry: industries.find(ind => ind.name === studentIndustry) || industries[0],
-      experienceYears: parseInt(studentExperience) || 0
+      experienceYears: parseInt(studentExperience) || 0,
+      profileImage: "https://randomuser.me/api/portraits/lego/1.jpg" // Default profile image for new students
     };
     
     setCurrentUser(newUser);
@@ -430,6 +433,18 @@ const MentorMatch: React.FC = () => {
     setCurrentAlumniForFeedback(alumni);
     setShowFeedbackModal(true);
   };
+  
+  // Handle opening forum - redirect to Forums tab with the selected alumni
+  const handleOpenForum = (alumni: Alumni) => {
+    // Save the selected alumni in localStorage for the Forums component to access
+    localStorage.setItem('activeForumAlumniId', alumni.id.toString());
+    localStorage.setItem('activeForumAlumniName', alumni.name);
+    
+    // Redirect to the Forums tab
+    window.location.href = '/forums';
+  };
+  
+  
   
   // Reset all filters
   const resetFilters = () => {
@@ -865,6 +880,14 @@ const MentorMatch: React.FC = () => {
                           </button>
                         )}
                         
+                        <button 
+                          onClick={() => handleOpenForum(alumni)}
+                          className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all font-medium flex items-center justify-center"
+                        >
+                          <Users className="h-5 w-5 mr-2" />
+                          Open Forum
+                        </button>
+                        
                         {feedbackSubmitted[alumni.id] ? (
                           <button 
                             disabled
@@ -899,6 +922,8 @@ const MentorMatch: React.FC = () => {
           )}
         </div>
       )}
+      
+      {/* Forum functionality moved to Forums.tsx */}
       
       {/* Feedback Modal */}
       {showFeedbackModal && (
