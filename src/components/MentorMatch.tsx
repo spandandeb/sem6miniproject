@@ -37,6 +37,7 @@ interface Mentor extends User {
 // ML model-based matching via API
 const fetchMatchScores = async (student: User, mentors: Mentor[]): Promise<Mentor[]> => {
   try {
+    console.log('Fetching match scores from ML model');
     const response = await fetch('http://localhost:5000/api/predict', {
       method: 'POST',
       headers: {
@@ -53,10 +54,12 @@ const fetchMatchScores = async (student: User, mentors: Mentor[]): Promise<Mento
     }
 
     const data = await response.json();
+    console.log('Received match scores from ML model');
     return data.mentors;
   } catch (error) {
     console.error('Error fetching match scores:', error);
     // Fallback to local calculation if API fails
+    console.log('Using fallback local calculation');
     return mentors.map(mentor => ({
       ...mentor,
       matchScore: calculateMatchScoreLocal(student, mentor)
@@ -66,41 +69,54 @@ const fetchMatchScores = async (student: User, mentors: Mentor[]): Promise<Mento
 
 // Fallback local calculation if API is unavailable
 const calculateMatchScoreLocal = (student: User, mentor: Mentor): number => {
+  // Create a feature vector similar to what our backend expects
+  const features = [];
+  
+  // Skills match (count of common skills)
+  const studentSkills = new Set(student.skills.map(skill => skill.name.toLowerCase()));
+  const mentorSkills = new Set(mentor.skills.map(skill => skill.name.toLowerCase()));
+  const commonSkills = [...studentSkills].filter(skill => mentorSkills.has(skill));
+  features.push(commonSkills.length);
+  
+  // Industry match (binary: 1 if same industry, 0 otherwise)
+  const industryMatch = student.industry.id === mentor.industry.id ? 1 : 0;
+  features.push(industryMatch);
+  
+  // Interests match (count of common interests)
+  const studentInterests = new Set(student.interests.map(interest => interest.toLowerCase()));
+  const mentorInterests = new Set(mentor.interests.map(interest => interest.toLowerCase()));
+  const commonInterests = [...studentInterests].filter(interest => mentorInterests.has(interest));
+  features.push(commonInterests.length);
+  
+  // Location match (binary: 1 if same location, 0 otherwise)
+  const locationMatch = student.location === mentor.location ? 1 : 0;
+  features.push(locationMatch);
+  
+  // Experience years difference (absolute difference)
+  const experienceDiff = Math.abs(student.experienceYears - mentor.experienceYears);
+  features.push(experienceDiff);
+  
+  // Mentor rating
+  features.push(mentor.rating);
+  
+  // Mentor total mentees
+  features.push(mentor.totalMentees);
+  
+  // Calculate score using the same weights as in the server's fallback
+  const weights = [15, 20, 10, 10, -2, 5, 2];
+  
+  // Adjust the experience_diff feature to be inverse (10 - diff, but min 0)
+  const adjustedFeatures = [...features];
+  adjustedFeatures[4] = Math.max(0, 10 - adjustedFeatures[4]);
+  
+  // Calculate weighted sum
   let score = 0;
-  const weights = {
-    skills: 0.4,
-    industry: 0.3,
-    interests: 0.2,
-    location: 0.1
-  };
-
-  // Calculate skill match
-  const studentSkillsSet = new Set(student.skills.map(skill => skill.name.toLowerCase()));
-  const mentorSkillsSet = new Set(mentor.skills.map(skill => skill.name.toLowerCase()));
-  const commonSkills = [...studentSkillsSet].filter(skill => mentorSkillsSet.has(skill));
-  const skillScore = commonSkills.length / Math.max(studentSkillsSet.size, 1);
+  for (let i = 0; i < Math.min(adjustedFeatures.length, weights.length); i++) {
+    score += adjustedFeatures[i] * weights[i];
+  }
   
-  // Calculate industry match
-  const industryScore = student.industry.id === mentor.industry.id ? 1 : 0;
-  
-  // Calculate interests match
-  const studentInterestsSet = new Set(student.interests.map(interest => interest.toLowerCase()));
-  const mentorInterestsSet = new Set(mentor.interests.map(interest => interest.toLowerCase()));
-  const commonInterests = [...studentInterestsSet].filter(interest => mentorInterestsSet.has(interest));
-  const interestScore = commonInterests.length / Math.max(studentInterestsSet.size, 1);
-  
-  // Calculate location match
-  const locationScore = student.location === mentor.location ? 1 : 0;
-  
-  // Calculate weighted score
-  score = (
-    weights.skills * skillScore +
-    weights.industry * industryScore +
-    weights.interests * interestScore +
-    weights.location * locationScore
-  ) * 100;
-  
-  return Math.round(score);
+  // Ensure score is between 0-100
+  return Math.min(100, Math.max(0, Math.round(score)));
 };
 
 const MentorMatch: React.FC = () => {
