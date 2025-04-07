@@ -6,6 +6,7 @@ import MentorMatch from './components/MentorMatch';
 import Analytics from './components/Analytics';
 import LoginPage from './pages/auth/LoginPage';
 import Home from './pages/Home';
+import Resources from './components/Resources'; // Adjust path if necessary
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function Navigation() {
@@ -103,6 +104,7 @@ function App() {
           <Navigation />
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/resources" element={<Resources />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mentors" element={<MentorMatch />} />
