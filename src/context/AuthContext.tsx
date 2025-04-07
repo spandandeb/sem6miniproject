@@ -14,6 +14,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check if user is already logged in (e.g., from localStorage)
     const token = localStorage.getItem('authToken');
+    console.log('AUTH INIT - Token exists:', !!token);
     if (token) {
       setIsAuthenticated(true);
     }
@@ -21,13 +22,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = () => {
     // In a real app, you would validate credentials and get a token
-    localStorage.setItem('authToken', 'dummy-token');
+    console.log('AUTH - Login called');
+    localStorage.setItem('authToken', 'dummy-token-12345');
     setIsAuthenticated(true);
+    console.log('AUTH - User is now authenticated');
   };
 
   const logout = () => {
+    console.log('AUTH - Logout called');
     localStorage.removeItem('authToken');
     setIsAuthenticated(false);
+    console.log('AUTH - User is now logged out');
   };
 
   return (
