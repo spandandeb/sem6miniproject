@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, MapPin, Briefcase, Clock, Star, MessageSquare, Filter, X } from 'lucide-react';
+import { Search, MapPin, Briefcase, Clock, Star, MessageSquare, Filter, X } from 'lucide-react';
+import FeedbackForm from './FeedbackForm';
 
 // Define interfaces for our data models
 interface Skill {
@@ -294,8 +295,7 @@ const MentorMatch: React.FC = () => {
   const [connectionRequests, setConnectionRequests] = useState<{[key: number]: boolean}>({});
   const [showFeedbackModal, setShowFeedbackModal] = useState<boolean>(false);
   const [currentAlumniForFeedback, setCurrentAlumniForFeedback] = useState<Alumni | null>(null);
-  const [feedbackRating, setFeedbackRating] = useState<number>(0);
-  const [feedbackComment, setFeedbackComment] = useState<string>('');
+
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<{[key: number]: boolean}>({});
 
   // Fetch alumni match scores on component mount
@@ -391,25 +391,10 @@ const MentorMatch: React.FC = () => {
   // Handle opening feedback modal
   const handleOpenFeedback = (alumni: Alumni): void => {
     setCurrentAlumniForFeedback(alumni);
-    setFeedbackRating(0);
-    setFeedbackComment('');
     setShowFeedbackModal(true);
   };
 
-  // Handle submitting feedback
-  const handleSubmitFeedback = (): void => {
-    if (currentAlumniForFeedback && feedbackRating > 0) {
-      // In a real app, you would send this feedback to the backend
-      console.log(`Feedback submitted for ${currentAlumniForFeedback.name}: ${feedbackRating} stars, "${feedbackComment}"`);
-      
-      setFeedbackSubmitted({
-        ...feedbackSubmitted,
-        [currentAlumniForFeedback.id]: true
-      });
-      
-      setShowFeedbackModal(false);
-    }
-  };
+
 
   // Reset all filters
   const resetFilters = (): void => {
@@ -717,65 +702,27 @@ const MentorMatch: React.FC = () => {
       {showFeedbackModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg overflow-hidden shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">
-                Feedback for {currentAlumniForFeedback?.name}
-              </h3>
-            </div>
-            
-            <div className="px-6 py-4">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Rating
-                </label>
-                <div className="flex space-x-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setFeedbackRating(star)}
-                      className={`p-1 rounded-full focus:outline-none ${
-                        feedbackRating >= star ? 'text-yellow-400' : 'text-gray-300'
-                      }`}
-                    >
-                      <Star className="h-8 w-8" fill={feedbackRating >= star ? 'currentColor' : 'none'} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-2">
-                  Comments (Optional)
-                </label>
-                <textarea
-                  id="feedback"
-                  rows={4}
-                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="Share your experience with this alumni..."
-                  value={feedbackComment}
-                  onChange={(e) => setFeedbackComment(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3">
-              <button
-                type="button"
+            <div className="flex justify-end p-2">
+              <button 
                 onClick={() => setShowFeedbackModal(false)}
-                className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="text-gray-500 hover:text-gray-700"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitFeedback}
-                disabled={feedbackRating === 0}
-                className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${feedbackRating === 0 ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
-              >
-                Submit Feedback
+                <X className="h-5 w-5" />
               </button>
             </div>
+            <FeedbackForm 
+              eventId={currentAlumniForFeedback?.id.toString() || ''} 
+              onClose={() => {
+                setShowFeedbackModal(false);
+                // Mark feedback as submitted for this alumni
+                if (currentAlumniForFeedback) {
+                  setFeedbackSubmitted((prev: {[key: number]: boolean}) => ({
+                    ...prev,
+                    [currentAlumniForFeedback.id]: true
+                  }));
+                }
+              }} 
+            />
           </div>
         </div>
       )}

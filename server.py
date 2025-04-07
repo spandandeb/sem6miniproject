@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import os
 import joblib
+import uuid
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -124,6 +126,61 @@ def create_feature_vector(student, mentor):
     features.append(total_mentees)
     
     return np.array(features)
+
+# In-memory storage for feedback (in a real app, this would be a database)
+feedback_data = []
+
+# Mock event data (in a real app, this would come from a database)
+events = {
+    "event1": "Tech Career Workshop",
+    "event2": "Resume Building Session",
+    "event3": "Interview Preparation Seminar",
+    "event4": "Networking Masterclass",
+    "event5": "Industry Insights Panel"
+}
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    try:
+        data = request.json
+        
+        # Validate required fields
+        required_fields = ['eventId', 'rating', 'eventExperience', 'speakerInteraction', 'sessionRelevance']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Create feedback object
+        feedback = {
+            "id": str(uuid.uuid4()),
+            "eventId": data['eventId'],
+            "eventName": events.get(data['eventId'], "Unknown Event"),
+            "rating": data['rating'],
+            "eventExperience": data['eventExperience'],
+            "speakerInteraction": data['speakerInteraction'],
+            "sessionRelevance": data['sessionRelevance'],
+            "suggestions": data.get('suggestions', ''),
+            "createdAt": datetime.now().isoformat()
+        }
+        
+        # Store feedback
+        feedback_data.append(feedback)
+        
+        return jsonify(feedback), 201
+    
+    except Exception as e:
+        print(f"Error submitting feedback: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/feedback', methods=['GET'])
+def get_feedback():
+    try:
+        # In a real app, you might want to add filtering, pagination, etc.
+        return jsonify(feedback_data)
+    
+    except Exception as e:
+        print(f"Error retrieving feedback: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

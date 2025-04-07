@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
-import { Users, LogOut } from 'lucide-react';
+import { Users, LogOut, BarChart } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MentorMatch from './components/MentorMatch';
+import Analytics from './components/Analytics';
 import LoginPage from './pages/auth/LoginPage';
 import Home from './pages/Home';
 
@@ -56,6 +57,13 @@ function Navigation() {
             >
               Events
             </button>
+            <button 
+              className="text-gray-600 hover:text-indigo-600 transition-colors font-medium flex items-center"
+              onClick={() => navigate('/analytics')}
+            >
+              <BarChart className="h-4 w-4 mr-1" />
+              Analytics
+            </button>
             {isLoggedIn ? (
               <button 
                 className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-all transform hover:scale-105 font-medium flex items-center"
@@ -92,6 +100,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/mentors" element={<MentorMatch />} />
+          <Route path="/analytics" element={<Analytics />} />
         </Routes>
       </div>
     </Router>
