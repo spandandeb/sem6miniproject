@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Users, MapPin, Briefcase, Clock, Star, MessageSquare } from 'lucide-react';
+import { Search, Users, MapPin, Briefcase, Clock, Star, MessageSquare, Filter, X } from 'lucide-react';
 
 // Define interfaces for our data models
 interface Skill {
@@ -24,7 +24,7 @@ interface User {
   experienceYears: number;
 }
 
-interface Mentor extends User {
+interface Alumni extends User {
   company: string;
   position: string;
   availability: string[];
@@ -32,10 +32,11 @@ interface Mentor extends User {
   totalMentees: number;
   profileImage: string;
   matchScore?: number;
+  graduationYear: number;
 }
 
 // ML model-based matching via API
-const fetchMatchScores = async (student: User, mentors: Mentor[]): Promise<Mentor[]> => {
+const fetchMatchScores = async (student: User, alumni: Alumni[]): Promise<Alumni[]> => {
   try {
     console.log('Fetching match scores from ML model');
     const response = await fetch('http://localhost:5000/api/predict', {
@@ -45,7 +46,7 @@ const fetchMatchScores = async (student: User, mentors: Mentor[]): Promise<Mento
       },
       body: JSON.stringify({
         student: student,
-        mentors: mentors
+        mentors: alumni // Backend still expects 'mentors' key
       }),
     });
 
@@ -60,47 +61,47 @@ const fetchMatchScores = async (student: User, mentors: Mentor[]): Promise<Mento
     console.error('Error fetching match scores:', error);
     // Fallback to local calculation if API fails
     console.log('Using fallback local calculation');
-    return mentors.map(mentor => ({
-      ...mentor,
-      matchScore: calculateMatchScoreLocal(student, mentor)
+    return alumni.map(alum => ({
+      ...alum,
+      matchScore: calculateMatchScoreLocal(student, alum)
     }));
   }
 };
 
 // Fallback local calculation if API is unavailable
-const calculateMatchScoreLocal = (student: User, mentor: Mentor): number => {
+const calculateMatchScoreLocal = (student: User, alumni: Alumni): number => {
   // Create a feature vector similar to what our backend expects
   const features = [];
   
   // Skills match (count of common skills)
   const studentSkills = new Set(student.skills.map(skill => skill.name.toLowerCase()));
-  const mentorSkills = new Set(mentor.skills.map(skill => skill.name.toLowerCase()));
-  const commonSkills = [...studentSkills].filter(skill => mentorSkills.has(skill));
+  const alumniSkills = new Set(alumni.skills.map(skill => skill.name.toLowerCase()));
+  const commonSkills = [...studentSkills].filter(skill => alumniSkills.has(skill));
   features.push(commonSkills.length);
   
   // Industry match (binary: 1 if same industry, 0 otherwise)
-  const industryMatch = student.industry.id === mentor.industry.id ? 1 : 0;
+  const industryMatch = student.industry.id === alumni.industry.id ? 1 : 0;
   features.push(industryMatch);
   
   // Interests match (count of common interests)
   const studentInterests = new Set(student.interests.map(interest => interest.toLowerCase()));
-  const mentorInterests = new Set(mentor.interests.map(interest => interest.toLowerCase()));
-  const commonInterests = [...studentInterests].filter(interest => mentorInterests.has(interest));
+  const alumniInterests = new Set(alumni.interests.map(interest => interest.toLowerCase()));
+  const commonInterests = [...studentInterests].filter(interest => alumniInterests.has(interest));
   features.push(commonInterests.length);
   
   // Location match (binary: 1 if same location, 0 otherwise)
-  const locationMatch = student.location === mentor.location ? 1 : 0;
+  const locationMatch = student.location === alumni.location ? 1 : 0;
   features.push(locationMatch);
   
   // Experience years difference (absolute difference)
-  const experienceDiff = Math.abs(student.experienceYears - mentor.experienceYears);
+  const experienceDiff = Math.abs(student.experienceYears - alumni.experienceYears);
   features.push(experienceDiff);
   
-  // Mentor rating
-  features.push(mentor.rating);
+  // Alumni rating
+  features.push(alumni.rating);
   
-  // Mentor total mentees
-  features.push(mentor.totalMentees);
+  // Alumni total mentees
+  features.push(alumni.totalMentees);
   
   // Calculate score using the same weights as in the server's fallback
   const weights = [15, 20, 10, 10, -2, 5, 2];
@@ -124,6 +125,12 @@ const MentorMatch: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   
+  // State for search and filters
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
+  const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  
   // Mock current user (student) data
   const [currentUser] = useState<User>({
     id: 1,
@@ -141,12 +148,37 @@ const MentorMatch: React.FC = () => {
     experienceYears: 1
   });
 
-  // Mock mentors data
-  const [allMentors] = useState<Mentor[]>([
+  // State for available skills and industries (for filtering)
+  const [availableSkills] = useState<Skill[]>([
+    { id: 1, name: "JavaScript" },
+    { id: 2, name: "React" },
+    { id: 3, name: "UI/UX Design" },
+    { id: 4, name: "Node.js" },
+    { id: 5, name: "TypeScript" },
+    { id: 6, name: "Python" },
+    { id: 7, name: "Data Science" },
+    { id: 8, name: "Machine Learning" },
+    { id: 9, name: "Product Management" },
+    { id: 10, name: "Cloud Computing" },
+    { id: 11, name: "DevOps" },
+    { id: 12, name: "Cybersecurity" }
+  ]);
+  
+  const [availableIndustries] = useState<Industry[]>([
+    { id: 1, name: "Technology" },
+    { id: 2, name: "Finance" },
+    { id: 3, name: "Healthcare" },
+    { id: 4, name: "Education" },
+    { id: 5, name: "Manufacturing" },
+    { id: 6, name: "Retail" }
+  ]);
+
+  // Mock alumni data
+  const [allAlumni] = useState<Alumni[]>([
     {
       id: 101,
       name: "Sarah Chen",
-      role: "Mentor",
+      role: "Alumni",
       skills: [
         { id: 1, name: "JavaScript" },
         { id: 2, name: "React" },
@@ -154,550 +186,592 @@ const MentorMatch: React.FC = () => {
         { id: 5, name: "TypeScript" }
       ],
       interests: ["Web Development", "Open Source", "Teaching"],
-      bio: "Senior developer with 8 years of experience in full-stack web development.",
+      bio: "Full-stack developer with 5 years of experience. Passionate about mentoring new developers.",
       location: "San Francisco",
       industry: { id: 1, name: "Technology" },
-      experienceYears: 8,
-      company: "Google",
-      position: "Senior Software Engineer",
-      availability: ["Monday evenings", "Wednesday afternoons", "Weekends"],
-      rating: 4.9,
-      totalMentees: 24,
-      profileImage: "https://randomuser.me/api/portraits/women/44.jpg"
+      experienceYears: 5,
+      company: "TechCorp",
+      position: "Senior Frontend Developer",
+      availability: ["Weekday Evenings", "Weekends"],
+      rating: 4.8,
+      totalMentees: 12,
+      profileImage: "https://randomuser.me/api/portraits/women/44.jpg",
+      graduationYear: 2018
     },
     {
       id: 102,
-      name: "Michael Rodriguez",
-      role: "Mentor",
+      name: "Marcus Johnson",
+      role: "Alumni",
       skills: [
-        { id: 3, name: "UI/UX Design" },
-        { id: 6, name: "Figma" },
-        { id: 7, name: "Adobe XD" }
+        { id: 6, name: "Python" },
+        { id: 7, name: "Data Science" },
+        { id: 8, name: "Machine Learning" }
       ],
-      interests: ["UI/UX Design", "Design Systems", "User Research"],
-      bio: "Product designer focused on creating intuitive user experiences.",
+      interests: ["AI/ML", "Data Visualization", "Research"],
+      bio: "Data scientist specializing in machine learning models for finance.",
       location: "New York",
-      industry: { id: 2, name: "Design" },
-      experienceYears: 6,
-      company: "Airbnb",
-      position: "Senior Product Designer",
-      availability: ["Tuesday afternoons", "Thursday evenings"],
-      rating: 4.7,
-      totalMentees: 18,
-      profileImage: "https://randomuser.me/api/portraits/men/32.jpg"
+      industry: { id: 2, name: "Finance" },
+      experienceYears: 7,
+      company: "FinTech Solutions",
+      position: "Lead Data Scientist",
+      availability: ["Weekends"],
+      rating: 4.9,
+      totalMentees: 8,
+      profileImage: "https://randomuser.me/api/portraits/men/32.jpg",
+      graduationYear: 2016
     },
     {
       id: 103,
       name: "Priya Patel",
-      role: "Mentor",
+      role: "Alumni",
       skills: [
-        { id: 8, name: "Python" },
-        { id: 9, name: "TensorFlow" },
-        { id: 10, name: "Machine Learning" }
+        { id: 9, name: "Product Management" },
+        { id: 3, name: "UI/UX Design" }
       ],
-      interests: ["AI/ML", "Data Science", "Research"],
-      bio: "AI researcher with a focus on natural language processing and computer vision.",
+      interests: ["Product Strategy", "UX Research", "Startups"],
+      bio: "Product manager with experience in both startups and enterprise companies.",
       location: "Seattle",
       industry: { id: 1, name: "Technology" },
-      experienceYears: 5,
-      company: "Microsoft",
-      position: "AI Research Scientist",
-      availability: ["Monday afternoons", "Friday evenings"],
-      rating: 4.8,
+      experienceYears: 6,
+      company: "ProductLab",
+      position: "Senior Product Manager",
+      availability: ["Weekday Evenings", "Weekends"],
+      rating: 4.7,
       totalMentees: 15,
-      profileImage: "https://randomuser.me/api/portraits/women/68.jpg"
+      profileImage: "https://randomuser.me/api/portraits/women/68.jpg" ,
+      graduationYear: 2017
     },
     {
       id: 104,
       name: "David Kim",
-      role: "Mentor",
+      role: "Alumni",
       skills: [
-        { id: 1, name: "JavaScript" },
-        { id: 11, name: "React Native" },
-        { id: 12, name: "Mobile Development" }
+        { id: 10, name: "Cloud Computing" },
+        { id: 11, name: "DevOps" },
+        { id: 12, name: "Cybersecurity" }
       ],
-      interests: ["Mobile Apps", "Cross-platform Development", "UI Animation"],
-      bio: "Mobile developer specializing in cross-platform solutions.",
-      location: "San Francisco",
+      interests: ["Cloud Architecture", "Security", "System Design"],
+      bio: "Cloud architect specializing in secure infrastructure and DevOps practices.",
+      location: "Chicago",
       industry: { id: 1, name: "Technology" },
-      experienceYears: 7,
-      company: "Uber",
-      position: "Lead Mobile Developer",
-      availability: ["Tuesday evenings", "Weekends"],
+      experienceYears: 8,
+      company: "CloudSecure",
+      position: "Principal Cloud Architect",
+      availability: ["Weekday Mornings"],
       rating: 4.6,
-      totalMentees: 20,
-      profileImage: "https://randomuser.me/api/portraits/men/75.jpg"
+      totalMentees: 6,
+      profileImage: "https://randomuser.me/api/portraits/men/75.jpg",
+      graduationYear: 2015
     },
     {
       id: 105,
-      name: "Emma Wilson",
-      role: "Mentor",
+      name: "Elena Rodriguez",
+      role: "Alumni",
       skills: [
-        { id: 13, name: "Product Management" },
-        { id: 14, name: "Agile" },
-        { id: 15, name: "User Stories" }
+        { id: 1, name: "JavaScript" },
+        { id: 2, name: "React" },
+        { id: 3, name: "UI/UX Design" }
       ],
-      interests: ["Product Strategy", "User-Centered Design", "Agile Methodologies"],
-      bio: "Product manager with experience in both startups and enterprise companies.",
-      location: "Boston",
+      interests: ["Web Development", "Mobile Apps", "Design Systems"],
+      bio: "Frontend developer focused on creating accessible and beautiful user interfaces.",
+      location: "San Francisco",
       industry: { id: 1, name: "Technology" },
-      experienceYears: 9,
-      company: "HubSpot",
-      position: "Senior Product Manager",
-      availability: ["Wednesday mornings", "Thursday afternoons"],
+      experienceYears: 4,
+      company: "DesignTech",
+      position: "UI/UX Developer",
+      availability: ["Weekends", "Weekday Evenings"],
       rating: 4.9,
-      totalMentees: 22,
-      profileImage: "https://randomuser.me/api/portraits/women/17.jpg"
+      totalMentees: 10,
+      profileImage: "https://randomuser.me/api/portraits/women/90.jpg" ,
+      graduationYear: 2019
     }
   ]);
 
-  // State for filtered and matched mentors
-  const [mentors, setMentors] = useState<Mentor[]>([]);
-  const [filteredMentors, setFilteredMentors] = useState<Mentor[]>([]);
+  // State for displayed alumni (after filtering and matching)
+  const [displayedAlumni, setDisplayedAlumni] = useState<Alumni[]>([]);
   
-  // Filter states
-  const [searchTerm, setSearchTerm] = useState('');
-  const [industryFilter, setIndustryFilter] = useState<number | null>(null);
-  const [locationFilter, setLocationFilter] = useState<string | null>(null);
-  const [experienceFilter, setExperienceFilter] = useState<number | null>(null);
-  const [skillFilter, setSkillFilter] = useState<number | null>(null);
-
-  // Feedback state
+  // State for connection requests and feedback
+  const [connectionRequests, setConnectionRequests] = useState<{[key: number]: boolean}>({});
+  const [showFeedbackModal, setShowFeedbackModal] = useState<boolean>(false);
+  const [currentAlumniForFeedback, setCurrentAlumniForFeedback] = useState<Alumni | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<number>(0);
+  const [feedbackComment, setFeedbackComment] = useState<string>('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<{[key: number]: boolean}>({});
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [currentMentorForFeedback, setCurrentMentorForFeedback] = useState<Mentor | null>(null);
-  const [feedbackRating, setFeedbackRating] = useState(5);
-  const [feedbackComment, setFeedbackComment] = useState('');
 
-  // Get all unique industries, locations, and skills for filters
-  const industries = Array.from(new Set(allMentors.map(mentor => mentor.industry.name)));
-  const locations = Array.from(new Set(allMentors.map(mentor => mentor.location)));
-  const allSkills = Array.from(
-    new Set(
-      allMentors.flatMap(mentor => 
-        mentor.skills.map(skill => skill.name)
-      )
-    )
-  );
-
-  // Apply ML-based matching on component mount
+  // Fetch alumni match scores on component mount
   useEffect(() => {
-    const fetchMentorScores = async () => {
-      setIsLoading(true);
-      setApiError(null);
-      try {
-        // Call the API to get mentor match scores using the ML model
-        const mentorsWithScores = await fetchMatchScores(currentUser, allMentors);
-        
-        // Sort by match score (highest first)
-        const sortedMentors = mentorsWithScores.sort((a, b) => 
-          (b.matchScore || 0) - (a.matchScore || 0)
-        );
-        
-        setMentors(sortedMentors);
-        setFilteredMentors(sortedMentors);
-      } catch (error) {
-        console.error('Error fetching mentor matches:', error);
-        setApiError('Failed to load mentor matches from ML model. Using fallback algorithm.');
-        
-        // Fallback to local calculation if API fails
-        const mentorsWithScores = allMentors.map(mentor => ({
-          ...mentor,
-          matchScore: calculateMatchScoreLocal(currentUser, mentor)
-        }));
-        
-        // Sort by match score (highest first)
-        const sortedMentors = mentorsWithScores.sort((a, b) => 
-          (b.matchScore || 0) - (a.matchScore || 0)
-        );
-        
-        setMentors(sortedMentors);
-        setFilteredMentors(sortedMentors);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchMentorScores();
-  }, [currentUser, allMentors]);
+    fetchAlumniScores();
+  }, []);
 
-  // Apply filters when they change
+  // Fetch alumni match scores whenever filters change
   useEffect(() => {
-    let result = [...mentors];
+    applyFilters();
+  }, [searchTerm, selectedSkills, selectedIndustry]);
+
+  // Function to fetch alumni scores from the API
+  const fetchAlumniScores = async () => {
+    setIsLoading(true);
+    setApiError(null);
     
-    // Apply search filter
+    try {
+      // Update the current user with selected skills and industry for matching
+      const userForMatching = {
+        ...currentUser,
+        skills: selectedSkills.length > 0 ? selectedSkills : currentUser.skills,
+        industry: selectedIndustry || currentUser.industry
+      };
+      
+      // Fetch match scores from the API
+      const scoredAlumni = await fetchMatchScores(userForMatching, allAlumni);
+      
+      // Apply any additional filters
+      applyFilters(scoredAlumni);
+    } catch (error) {
+      console.error('Error fetching alumni scores:', error);
+      setApiError('Failed to fetch alumni match scores. Please try again later.');
+      setDisplayedAlumni(allAlumni);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to apply filters to alumni list
+  const applyFilters = (alumniList = displayedAlumni.length ? displayedAlumni : allAlumni) => {
+    let filtered = [...alumniList];
+    
+    // Apply search term filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(mentor => 
-        mentor.name.toLowerCase().includes(term) || 
-        mentor.company.toLowerCase().includes(term) ||
-        mentor.position.toLowerCase().includes(term) ||
-        mentor.skills.some(skill => skill.name.toLowerCase().includes(term))
+      filtered = filtered.filter((alumni: Alumni) => 
+        alumni.name.toLowerCase().includes(term) ||
+        alumni.skills.some((skill: Skill) => skill.name.toLowerCase().includes(term)) ||
+        alumni.company.toLowerCase().includes(term) ||
+        alumni.position.toLowerCase().includes(term) ||
+        alumni.bio.toLowerCase().includes(term)
+      );
+    }
+    
+    // Apply skills filter
+    if (selectedSkills.length > 0) {
+      const skillIds = new Set(selectedSkills.map((skill: Skill) => skill.id));
+      filtered = filtered.filter((alumni: Alumni) => 
+        alumni.skills.some((skill: Skill) => skillIds.has(skill.id))
       );
     }
     
     // Apply industry filter
-    if (industryFilter !== null) {
-      result = result.filter(mentor => mentor.industry.id === industryFilter);
-    }
-    
-    // Apply location filter
-    if (locationFilter) {
-      result = result.filter(mentor => mentor.location === locationFilter);
-    }
-    
-    // Apply experience filter
-    if (experienceFilter !== null) {
-      result = result.filter(mentor => mentor.experienceYears >= experienceFilter);
-    }
-    
-    // Apply skill filter
-    if (skillFilter !== null) {
-      result = result.filter(mentor => 
-        mentor.skills.some(skill => skill.id === skillFilter)
+    if (selectedIndustry) {
+      filtered = filtered.filter((alumni: Alumni) => 
+        alumni.industry.id === selectedIndustry.id
       );
     }
     
-    setFilteredMentors(result);
-  }, [searchTerm, industryFilter, locationFilter, experienceFilter, skillFilter, mentors]);
+    // Sort by match score if available
+    filtered.sort((a: Alumni, b: Alumni) => {
+      if (a.matchScore !== undefined && b.matchScore !== undefined) {
+        return b.matchScore - a.matchScore;
+      }
+      return 0;
+    });
+    
+    setDisplayedAlumni(filtered);
+  };
 
-  // Handle requesting mentorship
-  const handleRequestMentorship = (mentor: Mentor) => {
-    // In a real app, this would send a request to the backend
-    alert(`Mentorship request sent to ${mentor.name}!`);
+  // Handle requesting connection with an alumni
+  const handleRequestConnection = (alumni: Alumni): void => {
+    setConnectionRequests({
+      ...connectionRequests,
+      [alumni.id]: true
+    });
+    
+    // In a real app, you would send this request to the backend
+    console.log(`Connection requested with ${alumni.name}`);
   };
 
   // Handle opening feedback modal
-  const handleOpenFeedback = (mentor: Mentor) => {
-    setCurrentMentorForFeedback(mentor);
+  const handleOpenFeedback = (alumni: Alumni): void => {
+    setCurrentAlumniForFeedback(alumni);
+    setFeedbackRating(0);
+    setFeedbackComment('');
     setShowFeedbackModal(true);
   };
 
   // Handle submitting feedback
-  const handleSubmitFeedback = () => {
-    if (!currentMentorForFeedback) return;
-    
-    // In a real app, this would send feedback to the backend
-    // and potentially update the ML model
-    
-    // For demo purposes, we'll just mark this mentor as having received feedback
-    setFeedbackSubmitted({
-      ...feedbackSubmitted,
-      [currentMentorForFeedback.id]: true
-    });
-    
-    // Close the modal and reset form
-    setShowFeedbackModal(false);
-    setFeedbackRating(5);
-    setFeedbackComment('');
-    setCurrentMentorForFeedback(null);
-    
-    alert('Thank you for your feedback! This helps us improve our matching algorithm.');
+  const handleSubmitFeedback = (): void => {
+    if (currentAlumniForFeedback && feedbackRating > 0) {
+      // In a real app, you would send this feedback to the backend
+      console.log(`Feedback submitted for ${currentAlumniForFeedback.name}: ${feedbackRating} stars, "${feedbackComment}"`);
+      
+      setFeedbackSubmitted({
+        ...feedbackSubmitted,
+        [currentAlumniForFeedback.id]: true
+      });
+      
+      setShowFeedbackModal(false);
+    }
   };
 
   // Reset all filters
-  const resetFilters = () => {
+  const resetFilters = (): void => {
     setSearchTerm('');
-    setIndustryFilter(null);
-    setLocationFilter(null);
-    setExperienceFilter(null);
-    setSkillFilter(null);
+    setSelectedSkills([]);
+    setSelectedIndustry(null);
+    fetchAlumniScores();
+  };
+
+  // Add a skill to the filter
+  const addSkillFilter = (skill: Skill): void => {
+    if (!selectedSkills.some((s: Skill) => s.id === skill.id)) {
+      setSelectedSkills([...selectedSkills, skill]);
+    }
+  };
+
+  // Remove a skill from the filter
+  const removeSkillFilter = (skillId: number): void => {
+    setSelectedSkills(selectedSkills.filter((skill: Skill) => skill.id !== skillId));
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {apiError && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md">
-          <p>{apiError}</p>
-        </div>
-      )}
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Alumni Connect</h1>
       
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Find Your Perfect Mentor
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Our ML-powered system matches you with mentors based on your skills, interests, and career goals.
-        </p>
-      </div>
-
-      {/* Search and filters */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-        <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4 mb-6">
+      {/* Search and Filter Bar */}
+      <div className="bg-white rounded-lg shadow-md p-4 mb-8">
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Search Input */}
           <div className="flex-1 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
             </div>
             <input
               type="text"
-              placeholder="Search mentors by name, company, position, or skills"
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Search alumni by name, skills, or company..."
+              className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+              onKeyPress={(e: React.KeyboardEvent) => e.key === 'Enter' && applyFilters()}
             />
-          </div>
-          <button
-            onClick={resetFilters}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-          >
-            Reset Filters
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Industry filter */}
-          <div>
-            <label htmlFor="industry" className="block text-sm font-medium text-gray-700 mb-1">
-              Industry
-            </label>
-            <select
-              id="industry"
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md"
-              value={industryFilter || ''}
-              onChange={(e) => setIndustryFilter(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">All Industries</option>
-              {industries.map((industry, index) => (
-                <option key={index} value={index + 1}>
-                  {industry}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Location filter */}
-          <div>
-            <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
-              Location
-            </label>
-            <select
-              id="location"
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md"
-              value={locationFilter || ''}
-              onChange={(e) => setLocationFilter(e.target.value || null)}
-            >
-              <option value="">All Locations</option>
-              {locations.map((location, index) => (
-                <option key={index} value={location}>
-                  {location}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Experience filter */}
-          <div>
-            <label htmlFor="experience" className="block text-sm font-medium text-gray-700 mb-1">
-              Min. Experience (Years)
-            </label>
-            <select
-              id="experience"
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md"
-              value={experienceFilter || ''}
-              onChange={(e) => setExperienceFilter(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">Any Experience</option>
-              <option value="3">3+ Years</option>
-              <option value="5">5+ Years</option>
-              <option value="7">7+ Years</option>
-              <option value="10">10+ Years</option>
-            </select>
-          </div>
-
-          {/* Skills filter */}
-          <div>
-            <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
-              Skills
-            </label>
-            <select
-              id="skills"
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md"
-              value={skillFilter || ''}
-              onChange={(e) => setSkillFilter(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">All Skills</option>
-              {allSkills.map((skill, index) => (
-                <option key={index} value={index + 1}>
-                  {skill}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Mentor cards */}
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-          <p className="ml-3 text-indigo-600 font-medium">Loading mentor matches from ML model...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filteredMentors.length > 0 ? (
-          filteredMentors.map((mentor) => (
-            <div key={mentor.id} className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-start">
-                  <div className="h-16 w-16 rounded-full overflow-hidden mr-4 border-2 border-indigo-100">
-                    <img src={mentor.profileImage} alt={mentor.name} className="h-full w-full object-cover" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">{mentor.name}</h3>
-                    <p className="text-indigo-600">{mentor.position} at {mentor.company}</p>
-                    
-                    {/* Match score */}
-                    <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
-                      <span className="mr-1">Match:</span>
-                      <span className="font-bold">{mentor.matchScore}%</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <div className="flex items-center text-sm text-gray-500 mb-2">
-                    <MapPin className="h-4 w-4 mr-1" />
-                    <span>{mentor.location}</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500 mb-2">
-                    <Briefcase className="h-4 w-4 mr-1" />
-                    <span>{mentor.industry.name} • {mentor.experienceYears} years</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500 mb-2">
-                    <Users className="h-4 w-4 mr-1" />
-                    <span>{mentor.totalMentees} mentees</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Star className="h-4 w-4 mr-1 text-yellow-400 fill-current" />
-                    <span>{mentor.rating.toFixed(1)}</span>
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Skills</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {mentor.skills.map((skill) => (
-                      <span 
-                        key={skill.id} 
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
-                      >
-                        {skill.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Availability</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {mentor.availability.map((time, index) => (
-                      <span 
-                        key={index} 
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                      >
-                        <Clock className="h-3 w-3 mr-1" />
-                        {time}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="mt-6 flex space-x-3">
-                  <button 
-                    onClick={() => handleRequestMentorship(mentor)}
-                    className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all font-medium flex items-center justify-center"
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Request Mentorship
-                  </button>
-                  
-                  {feedbackSubmitted[mentor.id] ? (
-                    <button 
-                      disabled
-                      className="flex-1 bg-gray-100 text-gray-400 px-4 py-2 rounded-lg font-medium flex items-center justify-center cursor-not-allowed"
-                    >
-                      Feedback Submitted
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleOpenFeedback(mentor)}
-                      className="flex-1 bg-white text-indigo-600 px-4 py-2 rounded-lg border border-indigo-600 hover:bg-indigo-50 transition-all font-medium"
-                    >
-                      Provide Feedback
-                    </button>
-                  )}
-                </div>
-              </div>
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+              <button 
+                onClick={() => applyFilters()}
+                className="h-5 w-5 text-gray-400 hover:text-indigo-600 focus:outline-none"
+                aria-label="Search"
+              >
+                <Search className="h-5 w-5" />
+              </button>
             </div>
-          ))
-        ) : (
-          <div className="col-span-3 text-center py-12">
-            <p className="text-gray-500 text-lg">No mentors found matching your filters. Try adjusting your search criteria.</p>
+          </div>
+          
+          {/* Filter Button */}
+          <button
+            onClick={(): void => setShowFilters(!showFilters)}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Filter className="h-5 w-5 mr-2" />
+            Filters
+            {(selectedSkills.length > 0 || selectedIndustry) && (
+              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                {selectedSkills.length + (selectedIndustry ? 1 : 0)}
+              </span>
+            )}
+          </button>
+          
+          {/* Reset Button (only shown if filters are applied) */}
+          {(selectedSkills.length > 0 || selectedIndustry || searchTerm) && (
             <button
               onClick={resetFilters}
-              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              Reset All Filters
+              <X className="h-5 w-5 mr-2" />
+              Reset
             </button>
+          )}
+        </div>
+        
+        {/* Expanded Filter Options */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Skills Filter */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Skills</h3>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {selectedSkills.map((skill: Skill) => (
+                    <span 
+                      key={skill.id} 
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                    >
+                      {skill.name}
+                      <button 
+                        type="button" 
+                        className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full text-indigo-400 hover:text-indigo-600 focus:outline-none"
+                        onClick={() => removeSkillFilter(skill.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <select
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                    const skillId = parseInt(e.target.value);
+                    if (skillId) {
+                      const skill = availableSkills.find((s: Skill) => s.id === skillId);
+                      if (skill) addSkillFilter(skill);
+                    }
+                    e.target.value = ""; // Reset select after selection
+                  }}
+                  value=""
+                >
+                  <option value="">Select a skill to add</option>
+                  {availableSkills
+                    .filter((skill: Skill) => !selectedSkills.some((s: Skill) => s.id === skill.id))
+                    .map((skill: Skill) => (
+                      <option key={skill.id} value={skill.id}>{skill.name}</option>
+                    ))
+                  }
+                </select>
+              </div>
+              
+              {/* Industry Filter */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Industry</h3>
+                <select
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  value={selectedIndustry?.id || ""}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                    const industryId = parseInt(e.target.value);
+                    if (industryId) {
+                      const industry = availableIndustries.find((i: Industry) => i.id === industryId);
+                      setSelectedIndustry(industry || null);
+                    } else {
+                      setSelectedIndustry(null);
+                    }
+                  }}
+                >
+                  <option value="">All Industries</option>
+                  {availableIndustries.map((industry: Industry) => (
+                    <option key={industry.id} value={industry.id}>{industry.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={(): void => setShowFilters(false)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Apply Filters
+              </button>
+            </div>
           </div>
         )}
       </div>
+      
+      {/* Loading and Error States */}
+      {isLoading && (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      )}
+      
+      {apiError && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-8">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                {apiError}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Alumni Grid */}
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {displayedAlumni.length > 0 ? (
+            displayedAlumni.map((alumni: Alumni) => (
+              <div key={alumni.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                {/* Alumni Card Header */}
+                <div className="relative">
+                  <div className="h-24 bg-gradient-to-r from-indigo-500 to-purple-600"></div>
+                  <div className="absolute -bottom-12 left-4">
+                    <img 
+                      src={alumni.profileImage} 
+                      alt={alumni.name} 
+                      className="h-24 w-24 rounded-full border-4 border-white object-cover"
+                    />
+                  </div>
+                  {alumni.matchScore !== undefined && (
+                    <div className="absolute top-4 right-4 bg-white rounded-full px-3 py-1 text-sm font-semibold text-indigo-600 shadow">
+                      {alumni.matchScore}% Match
+                    </div>
+                  )}
+                </div>
+                
+                {/* Alumni Card Body */}
+                <div className="pt-14 px-4 pb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">{alumni.name}</h3>
+                  <p className="text-gray-600">{alumni.position} at {alumni.company}</p>
+                  
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-start">
+                      <MapPin className="h-5 w-5 text-gray-400 mt-0.5 mr-2" />
+                      <span className="text-gray-600">{alumni.location}</span>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <Briefcase className="h-5 w-5 text-gray-400 mt-0.5 mr-2" />
+                      <span className="text-gray-600">{alumni.industry.name} • {alumni.experienceYears} years</span>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <Clock className="h-5 w-5 text-gray-400 mt-0.5 mr-2" />
+                      <span className="text-gray-600">Available: {alumni.availability.join(', ')}</span>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <Star className="h-5 w-5 text-yellow-400 mt-0.5 mr-2" />
+                      <span className="text-gray-600">{alumni.rating} • {alumni.totalMentees} mentees</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Skills</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {alumni.skills.map(skill => (
+                        <span 
+                          key={skill.id} 
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            selectedSkills.some(s => s.id === skill.id)
+                              ? 'bg-indigo-100 text-indigo-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {skill.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <p className="text-gray-600 text-sm line-clamp-3">{alumni.bio}</p>
+                  </div>
+                  
+                  <div className="mt-6 flex space-x-4">
+                    {connectionRequests[alumni.id] ? (
+                      <button 
+                        disabled
+                        className="flex-1 bg-gray-100 text-gray-400 px-4 py-2 rounded-lg font-medium flex items-center justify-center cursor-not-allowed"
+                      >
+                        <MessageSquare className="h-5 w-5 mr-2" />
+                        Request Sent
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleRequestConnection(alumni)}
+                        className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all font-medium flex items-center justify-center"
+                      >
+                        <MessageSquare className="h-5 w-5 mr-2" />
+                        Connect
+                      </button>
+                    )}
+                    
+                    {feedbackSubmitted[alumni.id] ? (
+                      <button 
+                        disabled
+                        className="flex-1 bg-gray-100 text-gray-400 px-4 py-2 rounded-lg font-medium flex items-center justify-center cursor-not-allowed"
+                      >
+                        Feedback Submitted
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleOpenFeedback(alumni)}
+                        className="flex-1 bg-white text-indigo-600 px-4 py-2 rounded-lg border border-indigo-600 hover:bg-indigo-50 transition-all font-medium"
+                      >
+                        Provide Feedback
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-3 text-center py-12">
+              <p className="text-gray-500 text-lg">No alumni found matching your filters. Try adjusting your search criteria.</p>
+              <button
+                onClick={resetFilters}
+                className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Reset All Filters
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Feedback Modal */}
       {showFeedbackModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Provide Feedback for {currentMentorForFeedback?.name}
-            </h3>
+          <div className="bg-white rounded-lg overflow-hidden shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">
+                Feedback for {currentAlumniForFeedback?.name}
+              </h3>
+            </div>
             
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rating
-              </label>
-              <div className="flex space-x-2">
-                {[1, 2, 3, 4, 5].map((rating) => (
-                  <button
-                    key={rating}
-                    type="button"
-                    onClick={() => setFeedbackRating(rating)}
-                    className={`p-2 rounded-full ${
-                      feedbackRating >= rating ? 'text-yellow-400' : 'text-gray-300'
-                    }`}
-                  >
-                    <Star className="h-6 w-6 fill-current" />
-                  </button>
-                ))}
+            <div className="px-6 py-4">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rating
+                </label>
+                <div className="flex space-x-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setFeedbackRating(star)}
+                      className={`p-1 rounded-full focus:outline-none ${
+                        feedbackRating >= star ? 'text-yellow-400' : 'text-gray-300'
+                      }`}
+                    >
+                      <Star className="h-8 w-8" fill={feedbackRating >= star ? 'currentColor' : 'none'} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-2">
+                  Comments (Optional)
+                </label>
+                <textarea
+                  id="feedback"
+                  rows={4}
+                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  placeholder="Share your experience with this alumni..."
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                />
               </div>
             </div>
             
-            <div className="mb-4">
-              <label htmlFor="feedback" className="block text-sm font-medium text-gray-700 mb-1">
-                Comments
-              </label>
-              <textarea
-                id="feedback"
-                rows={4}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="Share your experience with this mentor..."
-                value={feedbackComment}
-                onChange={(e) => setFeedbackComment(e.target.value)}
-              ></textarea>
-            </div>
-            
-            <div className="flex justify-end space-x-3">
+            <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setShowFeedbackModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSubmitFeedback}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                disabled={feedbackRating === 0}
+                className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${feedbackRating === 0 ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
               >
                 Submit Feedback
               </button>
