@@ -9,6 +9,11 @@ import LoginPage from './pages/auth/LoginPage';
 import Home from './pages/Home';
 import Resources from './components/Resources'; // Adjust path if necessary
 import { AuthProvider, useAuth } from './context/AuthContext';
+import UserSignup from './components/UserSignup';
+import AlumniSignup from './components/AlumniSignup';
+import Login from './components/Login';
+import DiscussionForum from './components/DiscussionForum';
+import ChatInterface from './components/ChatInterface';
 
 function Navigation() {
   const { isAuthenticated, logout } = useAuth();
@@ -107,10 +112,15 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/resources" element={<Resources />} />
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<UserSignup />} />
+            <Route path="/alumni-signup" element={<AlumniSignup />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mentors" element={<MentorMatch />} />
-            <Route path="/forums" element={<Forums currentUser={{
+            <Route path="/chat/:alumniId" element={<ChatInterface />} />
+            <Route path="/chat" element={<ChatInterface />} />
+            <Route path="/forums" element={<DiscussionForum />} />
+            <Route path="/forums-old" element={<Forums currentUser={{
               id: 1,
               name: localStorage.getItem('userName') || 'Current User',
               role: 'Student',
