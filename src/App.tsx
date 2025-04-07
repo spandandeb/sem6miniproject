@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { Users, LogOut, BarChart, MessageSquare } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -7,10 +7,16 @@ import Analytics from './components/Analytics';
 import Forums from './components/Forums';
 import LoginPage from './pages/auth/LoginPage';
 import Home from './pages/Home';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 function Navigation() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
   
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -26,7 +32,7 @@ function Navigation() {
             </div>
           </div>
           <div className="flex items-center space-x-8">
-            {isLoggedIn && (
+            {isAuthenticated && (
               <button 
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
                 onClick={() => navigate('/dashboard')}
@@ -59,20 +65,19 @@ function Navigation() {
             >
               Events
             </button>
-            <button 
-              className="text-gray-600 hover:text-indigo-600 transition-colors font-medium flex items-center"
-              onClick={() => navigate('/analytics')}
-            >
-              <BarChart className="h-4 w-4 mr-1" />
-              Analytics
-            </button>
-            {isLoggedIn ? (
+            {isAuthenticated && (
+              <button 
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium flex items-center"
+                onClick={() => navigate('/analytics')}
+              >
+                <BarChart className="h-4 w-4 mr-1" />
+                Analytics
+              </button>
+            )}
+            {isAuthenticated ? (
               <button 
                 className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 transition-all transform hover:scale-105 font-medium flex items-center"
-                onClick={() => {
-                  setIsLoggedIn(false);
-                  navigate('/');
-                }}
+                onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
@@ -94,24 +99,26 @@ function Navigation() {
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50">
-        <Navigation />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/mentors" element={<MentorMatch />} />
-          <Route path="/forums" element={<Forums currentUser={{
-            id: 1,
-            name: localStorage.getItem('userName') || 'Current User',
-            role: 'Student',
-            profileImage: "https://randomuser.me/api/portraits/lego/1.jpg"
-          }} />} />
-          <Route path="/analytics" element={<Analytics />} />
-        </Routes>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50">
+          <Navigation />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/mentors" element={<MentorMatch />} />
+            <Route path="/forums" element={<Forums currentUser={{
+              id: 1,
+              name: localStorage.getItem('userName') || 'Current User',
+              role: 'Student',
+              profileImage: "https://randomuser.me/api/portraits/lego/1.jpg"
+            }} />} />
+            <Route path="/analytics" element={<Analytics />} />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

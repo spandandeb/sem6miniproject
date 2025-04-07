@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUser, FaLock } from "react-icons/fa";
 import InputField from "../../components/InputField";
+import { useAuth } from "../../context/AuthContext";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -9,6 +10,7 @@ const LoginPage = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +27,7 @@ const LoginPage = () => {
 
       if (response.ok) {
         localStorage.setItem("token", data.token);
+        login(); // Call the login function from auth context
         navigate("/dashboard"); // Redirect to dashboard after successful login
       } else {
         setError(data.message || "Invalid credentials");

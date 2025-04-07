@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Users, MessageSquare, ArrowLeft } from 'lucide-react';
 import AlumniForum from './AlumniForum';
+import { useAuth } from '../context/AuthContext';
 
 interface ForumUser {
   id: number;
@@ -26,6 +27,8 @@ interface ForumsProps {
 }
 
 const Forums: React.FC<ForumsProps> = ({ currentUser, activeForumId }) => {
+  const { isAuthenticated } = useAuth();
+  const [activeAlumniId, setActiveAlumniId] = useState<number | null>(null);
   const [forums, setForums] = useState<ForumInfo[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeForumIndex, setActiveForumIndex] = useState<number | null>(null);
@@ -34,6 +37,14 @@ const Forums: React.FC<ForumsProps> = ({ currentUser, activeForumId }) => {
   useEffect(() => {
     // Fetch forums when component mounts
     fetchForums();
+    
+    // Check if we were redirected from MentorMatch with an active forum
+    const storedAlumniId = localStorage.getItem('activeForumAlumniId');
+    if (storedAlumniId) {
+      const alumniId = parseInt(storedAlumniId);
+      setActiveAlumniId(alumniId);
+      localStorage.removeItem('activeForumAlumniId');
+    }
   }, []);
 
   useEffect(() => {
@@ -44,7 +55,15 @@ const Forums: React.FC<ForumsProps> = ({ currentUser, activeForumId }) => {
         setActiveForumIndex(index);
       }
     }
-  }, [activeForumId, forums]);
+    
+    // If we have an activeAlumniId from localStorage, find and set the active forum
+    if (activeAlumniId) {
+      const index = forums.findIndex(forum => forum.alumniId === activeAlumniId);
+      if (index !== -1) {
+        setActiveForumIndex(index);
+      }
+    }
+  }, [activeForumId, activeAlumniId, forums]);
 
   const fetchForums = () => {
     setIsLoading(true);
@@ -134,6 +153,25 @@ const Forums: React.FC<ForumsProps> = ({ currentUser, activeForumId }) => {
     forum.alumniName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // If not authenticated, show login message
+  if (!isAuthenticated) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-white p-8">
+        <div className="text-center max-w-md">
+          <Users className="h-16 w-16 text-indigo-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Sign in to access forums</h2>
+          <p className="text-gray-600 mb-6">You need to be signed in to view and participate in mentor forums.</p>
+          <a 
+            href="/login"
+            className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-all font-medium"
+          >
+            Sign In
+          </a>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="p-4 border-b">
