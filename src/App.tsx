@@ -10,6 +10,11 @@ import Home from './pages/Home';
 import ResourceLibraryPage from './pages/ResourceLibraryPage';
 import EventsPage from './pages/EventsPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import UserSignup from './components/UserSignup';
+import AlumniSignup from './components/AlumniSignup';
+import Login from './components/Login';
+import DiscussionForum from './components/DiscussionForum';
+import ChatInterface from './components/ChatInterface';
 
 // Add console logs to verify imports
 console.log("ResourceLibraryPage import:", ResourceLibraryPage);
@@ -122,12 +127,22 @@ function App() {
           <Navigation />
           <Routes>
             <Route path="/" element={<Home />} />
+<<<<<<< HEAD
             <Route path="/resources" element={<ResourceLibraryPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/login" element={<Login />} />
+=======
+            <Route path="/resources" element={<Resources />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<UserSignup />} />
+            <Route path="/alumni-signup" element={<AlumniSignup />} />
+>>>>>>> 9deded8b420084f8db5b4205b5ce934b4b6c94da
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mentors" element={<MentorMatch />} />
-            <Route path="/forums" element={<Forums currentUser={{
+            <Route path="/chat/:alumniId" element={<ChatInterface />} />
+            <Route path="/chat" element={<ChatInterface />} />
+            <Route path="/forums" element={<DiscussionForum />} />
+            <Route path="/forums-old" element={<Forums currentUser={{
               id: 1,
               name: localStorage.getItem('userName') || 'Current User',
               role: 'Student',

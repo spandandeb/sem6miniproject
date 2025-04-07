@@ -6,8 +6,14 @@ const authRoutes = require("./routes/authRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const predictRoutes = require("./routes/predictRoutes");
 const interviewRoutes = require('./routes/interview');
+<<<<<<< HEAD
 const eventRoutes = require('./routes/eventRoutes');
 const resourceRoutes = require('./routes/resourceRoutes');
+=======
+const alumniRoutes = require('./routes/alumniRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const forumRoutes = require('./routes/forumRoutes');
+>>>>>>> 9deded8b420084f8db5b4205b5ce934b4b6c94da
 const cors = require("cors");
 
 // Load environment variables
@@ -56,6 +62,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api", predictRoutes);
 app.use('/api/interview', interviewRoutes);
+<<<<<<< HEAD
 app.use('/api/events', eventRoutes);
 app.use('/api/resources', resourceRoutes);
 
@@ -167,6 +174,11 @@ app.post('/api/debug/test-resource', (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+=======
+app.use('/api/alumni', alumniRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/forum', forumRoutes);
+>>>>>>> 9deded8b420084f8db5b4205b5ce934b4b6c94da
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
