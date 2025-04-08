@@ -107,6 +107,13 @@ function calculateLocalMatchScore(student, mentor) {
   score += mentor.rating * 5;
   score += Math.min(mentor.totalMentees, 10) * 2;
   
+  // Add a small random factor to create variability based on student profile
+  // This will ensure different students get slightly different match scores
+  // The random factor is seeded with a combination of student and mentor IDs
+  const randomSeed = (student.id * 1000 + mentor.id) % 100;
+  const randomFactor = (randomSeed / 100) * 10; // Random factor between 0-10%
+  score += randomFactor;
+  
   // Ensure score is between 0-100
   return Math.min(100, Math.max(0, Math.round(score)));
 }

@@ -15,7 +15,8 @@ def main():
     try:
         # Load the ML model from .pkl file
         import os
-        model_path = os.path.join(os.path.dirname(__file__), 'model.pkl')
+        # Look for the model in the src directory instead
+        model_path = os.path.join(os.path.dirname(__file__), '../../src/ml_model.pkl')
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
         

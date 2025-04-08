@@ -43,7 +43,7 @@ interface Alumni extends User {
 const fetchMatchScores = async (student: User, alumni: Alumni[]): Promise<Alumni[]> => {
   try {
     console.log('Fetching match scores from ML model');
-    const response = await fetch('http://localhost:5000/api/predict/predict', {
+    const response = await fetch('http://localhost:5000/api/predict', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
