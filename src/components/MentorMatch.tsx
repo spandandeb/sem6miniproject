@@ -28,6 +28,7 @@ interface User {
 }
 
 interface Alumni extends User {
+  _id?: string;  // MongoDB ID from backend
   company: string;
   position: string;
   availability: string[];
@@ -434,14 +435,12 @@ const MentorMatch: React.FC = () => {
     setShowFeedbackModal(true);
   };
   
-  // Handle opening forum - redirect to Forums tab with the selected alumni
+  // Handle opening forum - redirect to private chat with the selected alumni
   const handleOpenForum = (alumni: Alumni) => {
-    // Save the selected alumni in localStorage for the Forums component to access
-    localStorage.setItem('activeForumAlumniId', alumni.id.toString());
-    localStorage.setItem('activeForumAlumniName', alumni.name);
-    
-    // Redirect to the Forums tab
-    window.location.href = '/forums';
+    console.log("Opening chat with alumni:", alumni);
+    // Redirect to the private chat with this alumni
+    // Pass both the ID and name to ensure we get the correct alumni
+    window.location.href = `/chat?alumniId=${alumni._id || alumni.id}&alumniName=${encodeURIComponent(alumni.name)}&company=${encodeURIComponent(alumni.company || '')}&position=${encodeURIComponent(alumni.position || '')}`;
   };
   
   
