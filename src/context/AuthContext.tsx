@@ -68,6 +68,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+<<<<<<< HEAD
+    // Check if user is already logged in (e.g., from localStorage)
+    const token = localStorage.getItem('authToken');
+    console.log('AUTH INIT - Token exists:', !!token);
+    if (token) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const login = () => {
+    // In a real app, you would validate credentials and get a token
+    console.log('AUTH - Login called');
+    localStorage.setItem('authToken', 'dummy-token-12345');
+    setIsAuthenticated(true);
+    console.log('AUTH - User is now authenticated');
+=======
     loadUser();
   }, []);
 
@@ -126,13 +142,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     setLoading(false);
+>>>>>>> 9deded8b420084f8db5b4205b5ce934b4b6c94da
   };
 
   const logout = () => {
+    console.log('AUTH - Logout called');
     localStorage.removeItem('authToken');
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
+    console.log('AUTH - User is now logged out');
   };
 
   const clearError = () => {

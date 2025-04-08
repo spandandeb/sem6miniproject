@@ -1,19 +1,25 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
-import { Users, LogOut, BarChart, MessageSquare } from 'lucide-react';
+import { Users, LogOut, BarChart, MessageSquare, Calendar, BookOpen } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MentorMatch from './components/MentorMatch';
 import Analytics from './components/Analytics';
 import Forums from './components/Forums';
-import LoginPage from './pages/auth/LoginPage';
+import Login from './pages/Login';
 import Home from './pages/Home';
-import Resources from './components/Resources'; // Adjust path if necessary
+import ResourceLibraryPage from './pages/ResourceLibraryPage';
+import EventsPage from './pages/EventsPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import UserSignup from './components/UserSignup';
 import AlumniSignup from './components/AlumniSignup';
 import Login from './components/Login';
 import DiscussionForum from './components/DiscussionForum';
 import ChatInterface from './components/ChatInterface';
+
+// Add console logs to verify imports
+console.log("ResourceLibraryPage import:", ResourceLibraryPage);
+console.log("EventsPage import:", EventsPage);
+console.log("Login import:", Login);
 
 function Navigation() {
   const { isAuthenticated, logout } = useAuth();
@@ -53,10 +59,24 @@ function Navigation() {
               Mentors
             </button>
             <button 
-              className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
-              onClick={() => navigate('/resources')}
+              className="text-gray-600 hover:text-indigo-600 transition-colors font-medium flex items-center"
+              onClick={() => {
+                console.log("Navigating to Resources");
+                navigate('/resources');
+              }}
             >
+              <BookOpen className="h-4 w-4 mr-1" />
               Resources
+            </button>
+            <button 
+              className="text-gray-600 hover:text-indigo-600 transition-colors font-medium flex items-center"
+              onClick={() => {
+                console.log("Navigating to Events");
+                navigate('/events');
+              }}
+            >
+              <Calendar className="h-4 w-4 mr-1" />
+              Events
             </button>
             <button 
               className="text-gray-600 hover:text-indigo-600 transition-colors font-medium flex items-center"
@@ -64,12 +84,6 @@ function Navigation() {
             >
               <MessageSquare className="h-4 w-4 mr-1" />
               Forums
-            </button>
-            <button 
-              className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
-              onClick={() => navigate('/events')}
-            >
-              Events
             </button>
             {isAuthenticated && (
               <button 
@@ -104,6 +118,8 @@ function Navigation() {
 }
 
 function App() {
+  console.log("App component rendering");
+  
   return (
     <AuthProvider>
       <Router>
@@ -111,10 +127,16 @@ function App() {
           <Navigation />
           <Routes>
             <Route path="/" element={<Home />} />
+<<<<<<< HEAD
+            <Route path="/resources" element={<ResourceLibraryPage />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/login" element={<Login />} />
+=======
             <Route path="/resources" element={<Resources />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<UserSignup />} />
             <Route path="/alumni-signup" element={<AlumniSignup />} />
+>>>>>>> 9deded8b420084f8db5b4205b5ce934b4b6c94da
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mentors" element={<MentorMatch />} />
             <Route path="/chat/:alumniId" element={<ChatInterface />} />
