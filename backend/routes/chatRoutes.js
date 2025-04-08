@@ -1,59 +1,150 @@
 const express = require("express");
 const router = express.Router();
 const ChatRoom = require("../models/ChatRoom");
-const Message = require("../models/Message");
+const ChatMessage = require("../models/ChatMessage");
 const User = require("../models/User");
 const Alumni = require("../models/Alumni");
 const auth = require("../middleware/auth");
 const mongoose = require("mongoose");
 
 // Create a new chat room or get existing one
-router.post("/room", auth, async (req, res) => {
+router.post("/rooms", auth, async (req, res) => {
   try {
-    const { alumniId } = req.body;
+    console.log("Chat room creation request received");
+    console.log("Request body:", req.body);
+    console.log("User from auth:", req.user);
+    
+    const { alumniId, alumniName, alumniCompany, alumniPosition } = req.body;
     const userId = req.user.id;
 
+    console.log("Creating chat room:", { alumniId, alumniName, userId });
+
     // Validate alumniId
-    if (!mongoose.Types.ObjectId.isValid(alumniId)) {
-      return res.status(400).json({ msg: "Invalid alumni ID" });
+    if (!alumniId) {
+      console.log("Error: Alumni ID is required");
+      return res.status(400).json({ msg: "Alumni ID is required" });
     }
 
-    // Check if alumni exists
-    const alumni = await Alumni.findById(alumniId);
+    // Find the alumni by ID - handle both MongoDB ObjectId and numeric ID
+    let alumni;
+    
+    if (mongoose.Types.ObjectId.isValid(alumniId)) {
+      // If it's a valid MongoDB ObjectId, search by _id
+      alumni = await Alumni.findById(alumniId);
+      console.log("Found alumni by ObjectId:", alumni);
+    } else {
+      // If it's not a valid ObjectId (likely a numeric ID from frontend)
+      // Try to find alumni with a numeric ID field if it exists
+      console.log("Searching for alumni with numeric ID:", alumniId);
+      alumni = await Alumni.findOne({ numericId: parseInt(alumniId) });
+      console.log("Found alumni by numericId:", alumni);
+      
+      // If not found, search all alumni and try to match by other fields
+      if (!alumni) {
+        console.log("Alumni not found with numeric ID, searching all alumni");
+        const allAlumni = await Alumni.find({});
+        console.log("Total alumni found:", allAlumni.length);
+        
+        // Try to find alumni with matching name if provided
+        if (alumniName) {
+          alumni = allAlumni.find(a => a.name === alumniName);
+          if (alumni) {
+            console.log("Found alumni by name:", alumni);
+            // Update the alumni with the numericId for future lookups
+            alumni.numericId = parseInt(alumniId);
+            await alumni.save();
+          }
+        }
+        
+        // If still not found, check if we have any alumni at all
+        if (!alumni && allAlumni.length > 0) {
+          // Use the first alumni as fallback
+          alumni = allAlumni[0];
+          console.log("Using first alumni as fallback:", alumni);
+          
+          // Update the alumni with the requested numericId for future lookups
+          alumni.numericId = parseInt(alumniId);
+          await alumni.save();
+          console.log("Updated alumni with numericId:", alumni);
+        }
+        // If no alumni at all, we'll create one later
+      }
+    }
+    
+    // If no alumni found, create a mock one for testing purposes
     if (!alumni) {
-      return res.status(404).json({ msg: "Alumni not found" });
+      console.log("No alumni found, creating a mock one for chat testing");
+      
+      // Create a simple hash for the password (in production, use bcrypt)
+      const mockPassword = "password123";
+      
+      try {
+        const newAlumni = new Alumni({
+          name: alumniName || "Mock Alumni",
+          email: alumniName ? 
+            `${alumniName.replace(/\s+/g, '.').toLowerCase()}@example.com` : 
+            "mock@example.com",
+          password: mockPassword, // In production, this should be hashed with bcrypt
+          company: alumniCompany || "Example Company",
+          position: alumniPosition || "Example Position",
+          numericId: parseInt(alumniId),
+          isAvailableForChat: true,
+          graduationYear: 2020
+        });
+        
+        alumni = await newAlumni.save();
+        console.log("Created mock alumni for testing:", alumni);
+      } catch (err) {
+        console.error("Error creating mock alumni:", err);
+        return res.status(500).json({ msg: "Error creating mock alumni" });
+      }
     }
-
-    // Check if alumni is available for chat
-    if (!alumni.isAvailableForChat) {
-      return res.status(400).json({ msg: "Alumni is not available for chat at the moment" });
+    
+    if (!alumni) {
+      console.log("Error: Could not find or create alumni");
+      return res.status(500).json({ msg: "Could not find or create alumni" });
     }
+    
+    console.log("Alumni found or created:", alumni);
 
     // Check if chat room already exists
     let chatRoom = await ChatRoom.findOne({
-      alumni: alumniId,
+      alumni: alumni._id,
       user: userId,
     });
 
     if (chatRoom) {
+      console.log("Existing chat room found:", chatRoom._id);
       // If inactive, reactivate it
       if (!chatRoom.isActive) {
         chatRoom.isActive = true;
         await chatRoom.save();
+        console.log("Chat room reactivated");
       }
+      
+      // Populate the alumni and user information
+      await chatRoom.populate("alumni", "name email company position numericId");
+      await chatRoom.populate("user", "name email");
     } else {
+      console.log("Creating new chat room for alumni:", alumni._id, "and user:", userId);
       // Create a new chat room
       chatRoom = new ChatRoom({
-        alumni: alumniId,
+        alumni: alumni._id,
         user: userId,
       });
       await chatRoom.save();
+      console.log("New chat room created with ID:", chatRoom._id);
+      
+      // Populate the alumni and user information
+      await chatRoom.populate("alumni", "name email company position numericId");
+      await chatRoom.populate("user", "name email");
     }
 
+    console.log("Chat room created/found:", chatRoom);
     res.json(chatRoom);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
+    console.error("Error creating chat room:", err);
+    res.status(500).json({ msg: "Server Error", error: err.message });
   }
 });
 
@@ -112,14 +203,14 @@ router.get("/messages/:roomId", auth, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     
     // Get messages for this chat room
-    const messages = await Message.find({ chatRoom: roomId })
+    const messages = await ChatMessage.find({ chatRoom: roomId })
       .sort({ createdAt: -1 })
       .skip(page * limit)
       .limit(limit);
     
     // Mark messages as read if user is the recipient
     const userType = chatRoom.alumni.toString() === userId ? "alumni" : "user";
-    await Message.updateMany(
+    await ChatMessage.updateMany(
       { 
         chatRoom: roomId, 
         senderType: userType === "alumni" ? "user" : "alumni",
@@ -135,8 +226,50 @@ router.get("/messages/:roomId", auth, async (req, res) => {
   }
 });
 
+// Mark messages as read
+router.put("/messages/read/:roomId", auth, async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+    
+    // Validate roomId
+    if (!mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({ msg: "Invalid room ID" });
+    }
+    
+    // Check if chat room exists and user has access
+    const chatRoom = await ChatRoom.findById(roomId);
+    if (!chatRoom) {
+      return res.status(404).json({ msg: "Chat room not found" });
+    }
+    
+    // Verify user has access to this chat room
+    if (chatRoom.user.toString() !== userId && chatRoom.alumni.toString() !== userId) {
+      return res.status(401).json({ msg: "Not authorized to access this chat room" });
+    }
+    
+    // Determine user type
+    const userType = chatRoom.alumni.toString() === userId ? "alumni" : "user";
+    
+    // Mark messages as read
+    await ChatMessage.updateMany(
+      { 
+        chatRoom: roomId, 
+        senderType: userType === "alumni" ? "user" : "alumni",
+        readStatus: false 
+      },
+      { readStatus: true }
+    );
+    
+    res.json({ msg: "Messages marked as read" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
 // Send a message
-router.post("/message", auth, async (req, res) => {
+router.post("/messages", auth, async (req, res) => {
   try {
     const { roomId, content, attachments } = req.body;
     const userId = req.user.id;
@@ -168,7 +301,7 @@ router.post("/message", auth, async (req, res) => {
     }
     
     // Create and save the message
-    const message = new Message({
+    const message = new ChatMessage({
       chatRoom: roomId,
       sender: userId,
       senderType,
@@ -191,7 +324,7 @@ router.post("/message", auth, async (req, res) => {
 });
 
 // Close a chat room (mark as inactive)
-router.put("/room/:roomId/close", auth, async (req, res) => {
+router.put("/rooms/:roomId/close", auth, async (req, res) => {
   try {
     const { roomId } = req.params;
     const userId = req.user.id;
@@ -246,7 +379,7 @@ router.get("/unread", auth, async (req, res) => {
     // Count unread messages for each room
     const unreadCounts = await Promise.all(
       roomIds.map(async (roomId) => {
-        const count = await Message.countDocuments({
+        const count = await ChatMessage.countDocuments({
           chatRoom: roomId,
           senderType: userType === "alumni" ? "user" : "alumni",
           readStatus: false

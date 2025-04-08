@@ -28,6 +28,7 @@ interface User {
 }
 
 interface Alumni extends User {
+  _id?: string;  // MongoDB ID from backend
   company: string;
   position: string;
   availability: string[];
@@ -436,8 +437,10 @@ const MentorMatch: React.FC = () => {
   
   // Handle opening forum - redirect to private chat with the selected alumni
   const handleOpenForum = (alumni: Alumni) => {
+    console.log("Opening chat with alumni:", alumni);
     // Redirect to the private chat with this alumni
-    window.location.href = `/chat/${alumni.id}`;
+    // Pass both the ID and name to ensure we get the correct alumni
+    window.location.href = `/chat?alumniId=${alumni._id || alumni.id}&alumniName=${encodeURIComponent(alumni.name)}&company=${encodeURIComponent(alumni.company || '')}&position=${encodeURIComponent(alumni.position || '')}`;
   };
   
   

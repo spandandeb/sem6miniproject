@@ -1,0 +1,6 @@
+@echo off
+echo Killing existing server process on port 5000...
+npx kill-port 5000
+cd backend
+echo Starting server...
+npm run dev

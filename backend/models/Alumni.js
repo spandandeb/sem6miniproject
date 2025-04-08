@@ -10,6 +10,7 @@ const AlumniSchema = new mongoose.Schema({
   bio: { type: String },
   profilePicture: { type: String },
   isAvailableForChat: { type: Boolean, default: true },
+  numericId: { type: Number }, // For compatibility with frontend numeric IDs
 }, { timestamps: true });
 
 module.exports = mongoose.model("Alumni", AlumniSchema);
